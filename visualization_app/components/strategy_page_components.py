@@ -26,7 +26,15 @@ def create_tab(markdown_text: str, tab_label: str) -> dbc.Tab:
 
 
 about_markdown_text = """
-Hello World!
+In order to test the viability of a Momentum Strategy, as described by Wesley R. Gray and 
+Jack R. Vogel in their book 'Quantitative Momentum: A Practitioner's Guide to Building a Momentum-Based
+Stock Selection System,' the following backtesting engine was developed. The backtester looks to test 
+an intermediate based momentum strategy against decades of stock market data in order to get a sense of the 
+performance potential of such a strategy. As noted by Michale L. Halls-Moore in 'Succesful Algorithmic Trading', 
+a backtester must be wary of optimization bias, look-ahead bias, survivorship bias, and including market friction effects 
+(such as transaction costs, market impact, and slippage). 
+
+For this demo, we used 
 """
 
 strategy_markdown_text = """

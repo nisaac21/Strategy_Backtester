@@ -8,5 +8,4 @@ navbar = dbc.NavbarSimple(
         dbc.NavItem(dbc.NavLink("About Me", href="/about-me")),
     ],
     brand="Quantitative Momemntum Strategy Viability",
-    brand_href="#"
 )
