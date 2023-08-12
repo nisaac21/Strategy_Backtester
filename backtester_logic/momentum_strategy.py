@@ -1,7 +1,10 @@
 import numpy as np
-from collections import defaultdict
+import pandas as pd
 from datetime import datetime, timedelta
 from dateutil import relativedelta
+import sqlite3
+
+from utils import _ticker_to_table_name, _int_to_datetime
 
 
 class QuantitativeMomentum():
@@ -43,13 +46,16 @@ class QuantitativeMomentum():
     """
 
     def __init__(self,
-                 tickers: list(str),
+                 database_name: str,
+                 tickers,
                  look_back: int = 12,
                  firms_held: int = 50,
                  rebalance: int = 3,
                  momentum_consistency: int = 0.5,
                  max_d_return: int = 0.05) -> None:
 
+        self.connector = sqlite3.connect(database_name)
+        self.cursor = self.connector.cursor()
         self.tickers = tickers
         self.universe_size = len(self.tickers)
 
@@ -59,57 +65,52 @@ class QuantitativeMomentum():
         self.momentum_consistency = momentum_consistency
         self.max_d_return = max_d_return  # number of months to look back
 
-    def _ticker_to_index(self, ticker):
-        """Based off ticker list, returns relevant index"""
-        pass
+    def _access_stock_ohlc(self, ticker: str, date: int) -> int or dict:
+        """"Returns a stock's Open, High, Low, and Close data for a specific date.
+        If the date does not exist returns -1
 
-    def _index_to_ticker(self, index):
-        """Returns ticker based off of index"""
-        return self.tickers[index]
+        Parameters
+        ----------
+        ticker : (str) the stock symbol.US in all caps
+        date : (int) representing the date in YYYYMMDD"""
 
-    def _access_universe_info(self):
-        """"""
-        pass
+        query = (f"""SELECT Open, High, Low, Close
+                 FROM {_ticker_to_table_name(ticker)} WHERE Date = {date}""")
 
-    def _access_stock_ohlc(self, stock: int, date):
-        """TODO: Accesses the ticker OHLC data for specific ticker"""
-        pass
+        ohlc = self.crusor.execute(query).fetchall()
 
-    def _absolute_momentum(self, stock: int, date: datetime) -> float:
-        """TODO: Calculates the absolute momentum of the stock
+        if ohlc is None:
+            return -1
+
+        ohlc = ohlc[0]
+
+        return {'Open': ohlc[0], 'High': ohlc[1], 'Low': ohlc[2], 'Close': ohlc[3]}
+
+    def _absolute_momentum(self, ticker: str, date: datetime) -> float:
+        """Calculates the absolute momentum of the stock
 
             stock : (int) the index of the stock to look at 
         """
         look_back_date = date - \
             relativedelta(
                 months=self.look_back)  # get date from look back period ago
-        return self._access_stock_ohlc(stock, date)['close'] / self._access_stock_ohlc(stock, look_back_date)['close'] - 1
+        return self._access_stock_ohlc(ticker, date)['Close'] / self._access_stock_ohlc(ticker, look_back_date)['close'] - 1
 
-    # def _find_max_daily_return(self, stock: int, date: datetime):
-    #     """Finds the max daily return in the last self.max_d_return months ago
-
-    #     TODO: combine with _calculate_postive_days"""
-
-    #     # start months ago
-    #     cur_date = date - relativedelta(months=self.max_d_return)
-    #     max_d_return = float("-inf")
-
-    #     while cur_date <= date:
-    #         max_d_return = max(
-    #             max_d_return,
-    #             self._access_stock_ohlc(stock, cur_date)['close']
-    #         )
-
-    #         cur_date += timedelta(days=1)  # increment date by one day
-
-    #     return max_d_return
-
-    def _calculate_postive_days(self, stock: int, date: datetime) -> (float, float):
+    def _calculate_postive_days(self, ticker: int, date: int) -> (float, float):
         """Returns the % of postive days within the lookback period
+
+        Parameters
+        ----------
+        ticker : (str) ticker of the stock given in all caps .US
+        date : (int) representing the date given as YYYYMMDD
 
         TODO: Combine with _find_max_daily_return"""
 
+        date = _int_to_datetime(date)
+
         cur_date = date - relativedelta(months=self.look_back)
+        # 252 days in a trading year, relevant portion for one full calculation
+        min_days = int(252 * (self.look_back / 12))
         positive_days = 0
         negative_days = 0
         total_days = 0
@@ -117,8 +118,14 @@ class QuantitativeMomentum():
         while cur_date <= date:
             prev_day = cur_date - timedelta(days=1)
 
-            perc_return = self._access_stock_ohlc(stock, cur_date)[
-                'close'] / self._access_stock_ohlc(stock, prev_day)['close'] - 1
+            prev_close = self._access_stock_ohlc(ticker, cur_date)['Close']
+            current_close = self._access_stock_ohlc(
+                ticker, prev_day)['Close'] - 1
+
+            if prev_close == -1:
+                return -1
+
+            perc_return = current_close / prev_close - 1
 
             if perc_return > 1:
                 positive_days += 1
@@ -131,11 +138,82 @@ class QuantitativeMomentum():
 
         return positive_days / total_days, negative_days / total_days
 
+    def compute_parameters(self):
+        """Appends the following columns to each table in the Stock database 
+            - Generic Momentum for x Months: Return over last self.lookback months
+            - Percent Positive Days over x Months: The percent of positive return days over last self.lookback months
+            """
+
+        # 252 trading days in a year
+        min_days = int((self.look_back / 12) * 252)
+
+        for ticker in self.tickers['Ticker']:
+            current_table = pd.read_sql_query(
+                f"SELECT * from {_ticker_to_table_name(ticker)}",
+                con=self.connector)
+
+            num_of_dates = len(current_table)
+            new_columns = pd.DataFrame({
+                "Positive_Sum": np.zeros(num_of_dates),
+                "Current_Return": np.zeros(num_of_dates),
+                f"Return_{self.look_back}_Month": np.full(num_of_dates, -1),
+                f"Percent_Positive_Over_{self.look_back}_Months": np.full(num_of_dates, -1)})
+
+            total_days = 0
+
+            for index, row in current_table.iterrows():
+                if row['Close'] == -1:
+                    pass
+                elif total_days <= min_days:
+                    # We hit a valid OHLC data point but have not gathered enough data to draw a data point
+                    if index == 0:
+                        total_days += 1
+                    else:
+                        total_days += 1
+                        new_columns.loc[index,
+                                        'Positive_Sum'] = new_columns.loc[index - 1, 'Positive_Sum']
+                        # If stock made a positive return
+                        if row['Close'] > current_table.loc[index - 1, "Close"] and current_table.loc[index - 1, "Close"] != -1:
+                            new_columns.loc[index, 'Positive_Sum'] += 1
+                            new_columns.loc[index, 'Current_Return'] = 1
+                        # If stock made a negative return
+                        elif row['Close'] < current_table.loc[index - 1, "Close"]:
+                            new_columns.loc[index, 'Current_Return'] = -1
+                else:
+                    # Generic Momentum
+                    new_columns.loc[index, f"Return_{self.look_back}_Month"] = (
+                        row['Close'] / current_table.loc[index - min_days, "Close"]) - 1
+                    positive_sum = new_columns.loc[index - 1, 'Positive_Sum']
+
+                    # If the beginning of the look back period was positive,
+                    # we need to remove that from our count
+                    if new_columns.loc[index - min_days, "Current_Return"] == 1:
+                        positive_sum -= 1
+
+                    # If stock made a positive return
+                    if row['Close'] > current_table.loc[index - 1, 'Close']:
+                        positive_sum += 1
+                        new_columns.loc[index, 'Current_Return'] = 1
+                    # If stock made a negative return
+                    elif row['Close'] < current_table.loc[index - 1, "Close"]:
+                        new_columns.loc[index, 'Current_Return'] = -1
+
+                    # Necessary statistics
+                    new_columns.loc[index, 'Positive_Sum'] = positive_sum
+                    new_columns.loc[index,
+                                    f"Percent_Positive_Over_{self.look_back}_Months"] = positive_sum / min_days
+
+            # update sql table
+            pd.merge(
+                left=current_table,
+                right=new_columns[[
+                    f"Return_{self.look_back}_Month", f"Percent_Positive_Over_{self.look_back}_Months"]],
+                left_index=True,
+                right_index=True
+            ).to_sql(_ticker_to_table_name(ticker), self.connector, if_exists='replace', index=False)
+
     def portfolio_construction(self, year: int, month: int, day: int):
         """Returns the self.firm_size number of stocks that should be invested in for given date
-
-        TODO: Create ranking algorithm
-        TODO: Create system for tracking top self.firms_size ranks while iterating
         """
 
         date = datetime.date(year, month, day)
@@ -170,3 +248,16 @@ class QuantitativeMomentum():
                                               2].argsort()][:self.firms_held]
 
         return top_firms[:, 0]
+
+
+if __name__ == '__main__':
+
+    nasdaq_tickers = pd.read_csv('data/nasdaq_stock_tickers.csv')
+    nyse_tickers = pd.read_csv('data/nyse_stock_tickers.csv')
+
+    universe = pd.concat([nasdaq_tickers, nyse_tickers], ignore_index=True)
+
+    strategy = QuantitativeMomentum(
+        'data/MarketHistoricalData.db',
+        tickers=universe
+    )
