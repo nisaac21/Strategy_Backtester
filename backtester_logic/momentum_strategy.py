@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 from dateutil import relativedelta
 import sqlite3
+from tqdm import tqdm
 
 from utils import _ticker_to_table_name, _int_to_datetime
 
@@ -147,7 +148,7 @@ class QuantitativeMomentum():
         # 252 trading days in a year
         min_days = int((self.look_back / 12) * 252)
 
-        for ticker in self.tickers['Ticker']:
+        for ticker in tqdm(self.tickers['Ticker']):
             current_table = pd.read_sql_query(
                 f"SELECT * from {_ticker_to_table_name(ticker)}",
                 con=self.connector)
@@ -261,3 +262,5 @@ if __name__ == '__main__':
         'data/MarketHistoricalData.db',
         tickers=universe
     )
+
+    strategy.compute_parameters()
