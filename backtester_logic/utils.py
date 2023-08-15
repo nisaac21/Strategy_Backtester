@@ -17,10 +17,21 @@ def _int_to_datetime(datetime_int: int) -> datetime:
 
     Parameters
     ----------
-    date : (int) representing the date in YYYYMMDD"""
+    datetime_int : (int) representing the date in YYYYMMDD"""
 
     date = str(datetime_int)
     year = int(date[:4])
     month = int(date[4: 6])
     day = int(date[-2:])
     return datetime(year=year, month=month, day=day)
+
+
+def _datetime_to_int(datetime_date: datetime) -> int:
+    """Converts a datetime date into and int of the format YYYYMMDD
+
+    Parameters
+    ----------
+    datetime_date : (datetime) representing the date """
+
+    date_str = datetime_date.strftime('%Y%m%d')
+    return int(date_str)
