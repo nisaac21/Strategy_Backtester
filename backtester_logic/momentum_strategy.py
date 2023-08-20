@@ -1,15 +1,17 @@
 import numpy as np
 import pandas as pd
 import heapq
-from datetime import datetime, timedelta
-from dateutil import relativedelta
 import sqlite3
 from tqdm import tqdm
 from decouple import config
 
 from utils import _ticker_to_table_name, _int_to_datetime
 
-SLIPPAGE_FACTOR = config('SLIPPAGE_FACTOR')
+SLIPPAGE_FACTOR = float(config('SLIPPAGE_FACTOR'))
+
+"""
+TODO: Make an abstract Strategy class, require self.tickers, self.rebalance_period, and self.portfolio_construction()
+"""
 
 
 class QuantitativeMomentum():
@@ -52,10 +54,9 @@ class QuantitativeMomentum():
     def __init__(self,
                  database_name: str,
                  tickers,
+                 rebalance_period: int = 3,
                  look_back: int = 12,
-                 firms_held: int = 50,
-                 momentum_consistency: int = 0.5,
-                 max_d_return: int = 0.05) -> None:
+                 firms_held: int = 50) -> None:
 
         self.connector = sqlite3.connect(database_name)
         self.cursor = self.connector.cursor()
@@ -64,11 +65,87 @@ class QuantitativeMomentum():
 
         self.look_back = look_back
         self.firms_held = firms_held
+        self.rebalance_period = rebalance_period
+
+    def validate_data(self):
+        """For missing dates in our csv, we will append the data as the average of the above and below. 
+        Otherwise we will add in a row of -1's to signify trading has halted"""
+
+        query = f"""SELECT Date FROM {_ticker_to_table_name("GE.US")}"""
+        equity_timeseries = pd.read_sql_query(query, self.connector)
+        dates_len = len(equity_timeseries)
+
+        tickers_missing_dates = []
+
+        for ticker in tqdm(self.tickers['Ticker']):
+
+            query = f"SELECT * from {_ticker_to_table_name(ticker)}"
+            ticker_df = pd.read_sql_query(query, self.connector)
+
+            if len(ticker_df) != dates_len:
+                missing_dates = equity_timeseries[~equity_timeseries['Date'].isin(
+                    ticker_df['Date'])].copy()
+
+                for date in missing_dates['Date']:
+                    row_above_index = ticker_df.index[ticker_df['Date'] > date].min(
+                    )
+
+                    if pd.notna(row_above_index):
+                        prev_open, prev_high, prev_low, prev_close, prev_vol = ticker_df.loc[row_above_index - 1, [
+                            'Open', 'High', 'Low', 'Close', 'Vol']]
+                        next_open, next_high, next_low, next_close, next_vol = ticker_df.loc[row_above_index, [
+                            'Open', 'High', 'Low', 'Close', 'Vol']]
+
+                        def average(a, b): return (a + b) / 2
+
+                        missing_date_row = {
+                            'Ticker': ticker,
+                            'Per': 'D',
+                            'Date': date,  # fill this with the missing date
+                            'Time': -1,
+                            'Open': average(prev_open, next_open),
+                            'High': average(prev_high, next_high),
+                            'Low': average(prev_low, next_low),
+                            'Close': average(prev_close, next_close),
+                            'Vol': average(prev_vol, next_vol),
+                            'Openint': 0,
+                            'Return_12_Month': -1,
+                            'Percent_Positive_Over_12_Months': -1,
+                            'Percent_Negative_Over_12_Months': -1,
+                        }
+                    else:
+
+                        missing_date_row = {
+                            'Ticker': ticker,
+                            'Per': 'D',
+                            'Date': date,  # fill this with the missing date
+                            'Time': -1,
+                            'Open': -1,
+                            'High': -1,
+                            'Low': -1,
+                            'Close': -1,
+                            'Vol': -1,
+                            'Openint': -1,
+                            'Return_12_Month': -1,
+                            'Percent_Positive_Over_12_Months': -1,
+                            'Percent_Negative_Over_12_Months': -1,
+                        }
+
+                    ticker_df.loc[row_above_index - 0.5] = missing_date_row
+                    ticker_df = ticker_df.sort_index().reset_index(drop=True)
+
+                ticker_df.to_sql(_ticker_to_table_name(
+                    ticker), self.connector, if_exists='replace', index=False)
+                tickers_missing_dates.append(ticker)
+
+        return tickers_missing_dates
 
     def compute_parameters(self):
+        # OVERWRITES THE WHOLE TABLE
         """Appends the following columns to each table in the Stock database 
             - Generic Momentum for x Months: Return over last self.lookback months
             - Percent Positive Days over x Months: The percent of positive return days over last self.lookback months
+            -  Percent Negative_Days over x Months: The percent of negative return days over last self.lookback months
             """
 
         # 252 trading days in a year
@@ -157,7 +234,7 @@ class QuantitativeMomentum():
                 right_index=True
             ).to_sql(_ticker_to_table_name(ticker), self.connector, if_exists='replace', index=False)
 
-    def portfolio_construction(self, current_capital: int, date: int) -> (list[tuple(str, int, float)], int):
+    def portfolio_construction(self, current_capital: int, date: int) -> tuple[list[tuple[str, int, float]], float]:
         """Returns the self.firm_size number of stocks that should be invested in for given date
 
         Parameters
@@ -184,13 +261,13 @@ class QuantitativeMomentum():
             query = f"""SELECT 
             Return_{self.look_back}_Month,
             Percent_Positive_Over_{self.look_back}_Months, 
-            Negative_Positive_Over_{self.look_back}_Months,
+            Percent_Negative_Over_{self.look_back}_Months,
             OPEN
             FROM {_ticker_to_table_name(ticker)} 
             WHERE Date >= {date}
             ORDER BY Date
             LIMIT 2"""
-            return_value = self.cursor.execute(query).fetchone()
+            return_value = self.cursor.execute(query).fetchall()
             if return_value == []:
                 pass
             elif return_value[0][0] == -1:
@@ -209,8 +286,10 @@ class QuantitativeMomentum():
 
         # Choose top firms by fip_score next, calculate capital to deploy for each
         top_firms = []
-        capital_available = (1 / self.firms_held) * current_capital
-        for generic_momentum, fip_score, ticker, next_open in generic_momentum_screen:
+        # will allocate to all stocks in universe if pool is too small
+        capital_available = (
+            1 / min(self.firms_held, len(generic_momentum_screen))) * current_capital
+        for generic_momentum, fip_score, next_open, ticker in generic_momentum_screen:
             # cost of each share
             cost = SLIPPAGE_FACTOR * next_open
 
@@ -230,9 +309,9 @@ class QuantitativeMomentum():
 
         portfolio = [(ticker, shares_purcahsed, cost)
                      for _, shares_purcahsed, cost, ticker in top_firms]
-        cash_left = current_capital - \
-            sum(asset[1] * asset[2] for asset in portfolio)
+        capital_invested = sum(asset[1] * asset[2] for asset in portfolio)
+        cash_left = current_capital - capital_invested
 
         if cash_left < 0:
             raise Exception("Invested over max capital available")
-        return portfolio, cash_left
+        return portfolio, capital_invested, cash_left

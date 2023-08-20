@@ -9,9 +9,17 @@ import plotly.express as px
 dash.register_page(__name__)
 
 spx_d_df = pd.read_csv("./backtester_logic/data/spx_d.csv")
+spx_d_df['Close'] = spx_d_df['Close'] * (100_000 / 91.15)
+spx_d_df['Date'] = pd.to_datetime(spx_d_df['Date'], format='%m/%d/%Y')
 
-fig = px.line(data_frame=spx_d_df, x='Date',
-              y='Close', title='Benchmark Performance')
+equity_df = pd.read_csv("./backtester_logic/equity.csv")
+equity_df['Date'] = pd.to_datetime(
+    equity_df['Date'], format='%Y%m%d')
+
+# Create a line chart using Plotly Express
+fig = px.line(spx_d_df, x='Date', y='Close', title='Line Chart', log_y=True)
+fig.add_trace(px.line(equity_df, x='Date', y='Equity',
+              color_discrete_sequence=['red'], log_y=True).data[0])
 
 layout = html.Div([
 
