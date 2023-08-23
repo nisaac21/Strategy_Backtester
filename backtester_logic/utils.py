@@ -35,3 +35,7 @@ def _datetime_to_int(datetime_date: datetime) -> int:
 
     date_str = datetime_date.strftime('%Y%m%d')
     return int(date_str)
+
+
+def _strategy_table_convention(look_back, lottery_window, rebalance, firms_held):
+    return f'equity_lw{lottery_window}_lb{look_back}_reb{rebalance}_fh{firms_held}'

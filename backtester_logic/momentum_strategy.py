@@ -56,6 +56,7 @@ class QuantitativeMomentum():
                  tickers,
                  rebalance_period: int = 3,
                  look_back: int = 12,
+                 lottery_window: int = 1,
                  firms_held: int = 50) -> None:
 
         self.connector = sqlite3.connect(database_name)
@@ -64,6 +65,7 @@ class QuantitativeMomentum():
         self.universe_size = len(self.tickers)
 
         self.look_back = look_back
+        self.lottery_window = lottery_window
         self.firms_held = firms_held
         self.rebalance_period = rebalance_period
 
@@ -140,8 +142,8 @@ class QuantitativeMomentum():
 
         return tickers_missing_dates
 
-    def compute_parameters(self):
-        # OVERWRITES THE WHOLE TABLE
+    def compute_parameters(self) -> None:
+        # TODO: FIX SO THAT ONLY NEW COLUMNS ADDED
         """Appends the following columns to each table in the Stock database 
             - Generic Momentum for x Months: Return over last self.lookback months
             - Percent Positive Days over x Months: The percent of positive return days over last self.lookback months
@@ -154,7 +156,15 @@ class QuantitativeMomentum():
         for ticker in tqdm(self.tickers['Ticker']):
             current_table = pd.read_sql_query(
                 f"""SELECT 
-                Ticker, Per, Date, Time, Open, High, Low, Close, Vol, Openint
+                Ticker, Per, Date, Time, Open, High, Low, Close, Vol, Openint,
+                Percent_Positive_Over_1_Months, 
+                Percent_Negative_Over_1_Months, 
+                Percent_Positive_Over_3_Months,
+                Percent_Negative_Over_3_Months, 
+                Percent_Positive_Over_12_Months, 
+                Percent_Negative_Over_12_Months, 
+                Return_12_Month, 
+                Return_60_Month
                 FROM {_ticker_to_table_name(ticker)}""",
                 con=self.connector)
 
@@ -164,8 +174,8 @@ class QuantitativeMomentum():
                 "Negative_Sum": np.zeros(num_of_dates),
                 "Current_Return": np.zeros(num_of_dates),
                 f"Return_{self.look_back}_Month": np.full(num_of_dates, -1),
-                f"Percent_Positive_Over_{self.look_back}_Months": np.full(num_of_dates, -1),
-                f"Percent_Negative_Over_{self.look_back}_Months": np.full(num_of_dates, -1)})
+                f"Percent_Positive_Over_{self.lottery_window}_Months": np.full(num_of_dates, -1),
+                f"Percent_Negative_Over_{self.lottery_window}_Months": np.full(num_of_dates, -1)})
 
             total_days = 0
 
@@ -219,17 +229,17 @@ class QuantitativeMomentum():
                     new_columns.loc[index, 'Negative_Sum'] = negative_sum
 
                     new_columns.loc[index,
-                                    f"Percent_Positive_Over_{self.look_back}_Months"] = positive_sum / min_days
+                                    f"Percent_Positive_Over_{self.lottery_window}_Months"] = positive_sum / min_days
                     new_columns.loc[index,
-                                    f"Percent_Negative_Over_{self.look_back}_Months"] = negative_sum / min_days
+                                    f"Percent_Negative_Over_{self.lottery_window}_Months"] = negative_sum / min_days
 
             # update sql table
             pd.merge(
                 left=current_table,
                 right=new_columns[[
                     f"Return_{self.look_back}_Month",
-                    f"Percent_Positive_Over_{self.look_back}_Months",
-                    f"Percent_Negative_Over_{self.look_back}_Months"]],
+                    f"Percent_Positive_Over_{self.lottery_window}_Months",
+                    f"Percent_Negative_Over_{self.lottery_window}_Months"]],
                 left_index=True,
                 right_index=True
             ).to_sql(_ticker_to_table_name(ticker), self.connector, if_exists='replace', index=False)

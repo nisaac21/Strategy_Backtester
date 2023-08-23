@@ -1,0 +1,56 @@
+
+
+**Introduction:**
+Quantitative finance, a relativly novel approach to investing, relies on systemic processes in order to make decision on which 
+assets to purchase for maximum profitability in a given market. Such algorithms are powerful as they (partially) remove the need
+for human intervention, an often significant source of losses and volatility. In the realm of quantitative finance, developing and implementing a robust investment strategy is crucial. 
+One such approach, detailed in the book "Quantitative Momentum: A Practitioner's Guide to 
+Building a Momentum-Based Stock Selection System," focuses on harnessing momentum to select winning stocks. 
+This summary outlines the core concepts of the momentum strategy, its empirical basis, and the backtesting framework 
+I've developed to evaluate its performance. In order to test the viability of a Momentum Strategy, as described 
+by Wesley R. Gray and Jack R. Vogel the following backtesting engine was developed
+
+**Data and Development:**
+Paramount to a succesful evaluation of a strategy is data. This project utilizes OHLC data over 8500 equities 
+spanning decades of trade history sourced from Stooq. To clean the data we deleted any empty files, converted from text to csv, 
+filled in missing data points, and otherwise prepared the information in a format that could be analyzed. We stored all the data 
+in SQLite for management and querying. 
+
+**Strategy Overview:**
+The momentum strategy involves capitalizing on the tendency of stocks that have performed well in the past to continue 
+performing well in the future. This principle underpins the "buying winners" philosophy, where the strategy sorts stocks 
+based on their past returns and constructs portfolios accordingly. The key idea is that behavioral biases, market frictions, 
+and career risk create mispriced opportunities that can be exploited systematically.
+
+The strategy has the following parameters...
+
+Look back period: How long ago to judge a stock's generic momenutm. Generic momentum
+is defined as the absolute return of an equity over that time period. 
+
+Lottery Window: The 'lottery' bias of the market is the human tendency to overestimate 
+the likelihood of slim odds. This means that stocks the market overvalues high risk high reward 
+equities, therby leaving less investment capital for the steadier more consistent tickers. Our strategy
+utilizes this by measuring what percent of the days in the lottery window time period were positive for the 
+stock. 
+
+Firms Held: The maximum number of equities our strategy will hold at a time 
+
+Rebalance frequency: How often we rebalance the portfolio 
+
+When constructing or rebalancing a portfolio, the strategy first sorts all equities in our database by their generic momentum
+over the look back period and selects the top 10%. The strategy will then organize the equities by their FIP score, calculated by
+$Generic Momentum * (Percent Positive Days - Percent Negative Days)$ for relevant periods and evenly distributes capital into 
+the top stocks held, building a maxium sized portfolio decided by the parameters. 
+
+**Execution**
+This analysis was designed to remove as many biases as possible. To avoid lookahead bias, our software only makes decisions after the market close
+(so if making trading decisions for 1/2 all decisions would have been decided on 1/1 night). Since our dataset lacks orderbook analytics, 
+we simulated trading costs and other market friction costs by charging an extra 1% from market opens the next day. Even with 
+the attention paid to possible artificial performance boosts, there are some limitations a user should be aware of. Due to cost 
+constraints, the backtester does not have access to survivorship bias free data, so delisted equities were not tested. 
+
+**Results** 
+
+**Disclaimer**
+The material provided on this website should be used for informational purposes only and in 
+no way should be relied upon for financial advice 
