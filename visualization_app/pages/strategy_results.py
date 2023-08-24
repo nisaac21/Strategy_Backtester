@@ -1,27 +1,18 @@
 from dash import html, dcc, callback, Input, Output
 import dash
 import dash_bootstrap_components as dbc
-from components.strategy_page_components import content_explanation, stats_table
+from components.strategy_page_components import content_explanation, stats_table, performance_graph
 import pandas as pd
 import plotly.express as px
 
 
 dash.register_page(__name__)
 
-spx_d_df = pd.read_csv("./backtester_logic/data/spx_d.csv")
-spx_d_df['Date'] = pd.to_datetime(spx_d_df['Date'], format='%Y%m%d')
 
-equity_df = pd.read_csv("./backtester_logic/equity.csv")
-equity_df['Date'] = pd.to_datetime(
-    equity_df['Date'], format='%Y%m%d')
-
-# Create a line chart using Plotly Express
-fig = px.line(spx_d_df, x='Date', y='Equity',
-              title='Performance comparison', log_y=True)
-
-fig.add_trace(px.line(equity_df, x='Date', y='Equity',
-              color_discrete_sequence=['red'], log_y=True).data[0])
-
+"""
+    App Layout
+    ----------
+"""
 layout = html.Div([
 
     # Header
@@ -45,7 +36,7 @@ layout = html.Div([
                 dbc.Col([
                     # Graph
                     dbc.Row(
-                        [dcc.Graph(figure=fig)],
+                        [dcc.Graph(figure=performance_graph)],
                         style={'margin': '25px'}
                     ),
 
@@ -68,3 +59,11 @@ layout = html.Div([
     ])
 
 ])
+
+
+@callback(
+    Output(component_id='my-output', component_property='children'),
+    Input(component_id='strategy_button', component_property='n_clicks')
+)
+def update_output_div(input_value):
+    return f'You Chose: {input_value}'
