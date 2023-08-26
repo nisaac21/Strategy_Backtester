@@ -1,3 +1,4 @@
 /venv
 /backtester_logic/data
+/backtester_logic/__pycache__
 .env
