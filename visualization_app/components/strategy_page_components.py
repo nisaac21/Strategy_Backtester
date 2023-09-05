@@ -2,12 +2,26 @@ import dash_bootstrap_components as dbc
 from dash import html, dcc
 import pandas as pd
 import plotly.express as px
-from components.utils import _get_statistics
+from components.utils import _get_statistics, _strategy_table_convention
+from components.const import INTIAL_CAPITAL, DATABASE_PATH
+import sqlite3
 
-spx_d_df = pd.read_csv("./backtester_logic/data/spx_d.csv")
-equity_df = pd.read_csv("./backtester_logic/equity.csv")
-spx_stats = _get_statistics(spx_d_df, 100_000)
-equity_stats = _get_statistics(equity_df, 100_000)
+conn = sqlite3.connect(DATABASE_PATH)
+
+spx_d_df = pd.read_sql("SELECT * FROM SPX_DAILY", con=conn)
+
+equity_df = pd.read_sql(
+    f"""SELECT * FROM {_strategy_table_convention(
+            look_back=12,
+            lottery_window=12,
+            rebalance=3,
+            firms_held=50
+        )}""",
+    con=conn
+)
+
+spx_stats = _get_statistics(spx_d_df, INTIAL_CAPITAL)
+equity_stats = _get_statistics(equity_df, INTIAL_CAPITAL)
 
 """
     Strategy Used and Backtesting Process Card
@@ -46,16 +60,17 @@ strategy_cardbody = [
             [12, 36, 60], 'Look Back Window:', 'Months'), style=select_style),
          html.Br(),
          dbc.Select(id='lottery_window', placeholder='Lottery Window', options=_create_options(
-             [1, 3, 6, 9, 12], 'Lottery Window:', 'Months'), style=select_style),
+             [1, 3, 6, 12], 'Lottery Window:', 'Months'), style=select_style),
          html.Br(),
          dbc.Select(id='rebalnce_period', placeholder='Rebalance Period', options=_create_options(
-             [1, 3, 6, 9, 12], 'Rebalance Every:', 'Months'), style=select_style),
+             [1, 3, 6, 12], 'Rebalance Every:', 'Months'), style=select_style),
          html.Br(),
          dbc.Select(id='firms_held', placeholder='Firms Held', options=_create_options(
              [25, 50, 100, 200], 'Hold:', 'Firms'), style=select_style),
          html.Br(),
          dbc.Button("Visualize Strategy", id='strategy_button'),
-         html.Div(id='my-output')])
+         html.Div(id='my-output')]
+    )
 ]
 
 content_explanation = dbc.Tabs(
@@ -71,15 +86,23 @@ content_explanation = dbc.Tabs(
 """
 
 spx_d_df['Date'] = pd.to_datetime(spx_d_df['Date'], format='%Y%m%d')
-equity_df['Date'] = pd.to_datetime(
-    equity_df['Date'], format='%Y%m%d')
 
-# Create a line chart using Plotly Express
-performance_graph = px.line(spx_d_df, x='Date', y='Equity',
-                            title='Performance comparison', log_y=True)
 
-performance_graph.add_trace(px.line(equity_df, x='Date', y='Equity',
-                                    color_discrete_sequence=['red'], log_y=True).data[0])
+def create_performance_graph(equity_df):
+    equity_df['Date'] = pd.to_datetime(
+        equity_df['Date'], format='%Y%m%d')
+
+    # Lime chart with plotlhy express
+    performance_graph = px.line(spx_d_df, x='Date', y='Equity',
+                                title='Performance comparison', log_y=True)
+
+    performance_graph.add_trace(px.line(equity_df, x='Date', y='Equity',
+                                        color_discrete_sequence=['red'], log_y=True).data[0])
+
+    return performance_graph
+
+
+initial_performance_graph = create_performance_graph(equity_df)
 
 """
     Performance Statics Table
@@ -107,4 +130,28 @@ statistics = [
 table_body = [html.Tbody(
     [html.Tr([html.Td(statistic), html.Td(equity_stats[statistic]), html.Td(spx_stats[statistic])]) for statistic in statistics])]
 
-stats_table = dbc.Table(table_header + table_body, bordered=True)
+
+def create_stats_table(equity_stats):
+
+    statistics = [
+        'Overall Return',
+        'CAGR',
+        'Standard Deviation',
+        'Downside Deviation',
+        'Sharpe Ratio',
+        # 'Sortino Ratio',
+        'Max Drawdown',
+        'Worst Month Return',
+        'Best Month Return',
+        'Profitable Months'
+    ]
+
+    table_body = [html.Tbody(
+        [html.Tr([html.Td(statistic), html.Td(equity_stats[statistic]), html.Td(spx_stats[statistic])]) for statistic in statistics])]
+
+    stats_table = dbc.Table(table_header + table_body, bordered=True)
+
+    return stats_table
+
+
+initial_stats_table = create_stats_table(equity_stats)

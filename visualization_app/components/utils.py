@@ -124,3 +124,7 @@ def _get_statistics(equity_timeseries: pd.DataFrame, starting_capital: int) -> d
         'Best Month Return': f"{round(extreme_month_returns['best'] * 100, 2)} %",
         'Profitable Months': f"{round(_profitable_months(equity_timeseries) * 100, 2)} %"
     }
+
+
+def _strategy_table_convention(look_back, lottery_window, rebalance, firms_held):
+    return f'equity_lw{lottery_window}_lb{look_back}_reb{rebalance}_fh{firms_held}'

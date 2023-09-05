@@ -156,15 +156,7 @@ class QuantitativeMomentum():
         for ticker in tqdm(self.tickers['Ticker']):
             current_table = pd.read_sql_query(
                 f"""SELECT 
-                Ticker, Per, Date, Time, Open, High, Low, Close, Vol, Openint,
-                Percent_Positive_Over_1_Months, 
-                Percent_Negative_Over_1_Months, 
-                Percent_Positive_Over_3_Months,
-                Percent_Negative_Over_3_Months, 
-                Percent_Positive_Over_12_Months, 
-                Percent_Negative_Over_12_Months, 
-                Return_12_Month, 
-                Return_60_Month
+                *
                 FROM {_ticker_to_table_name(ticker)}""",
                 con=self.connector)
 
@@ -270,8 +262,8 @@ class QuantitativeMomentum():
         for ticker in self.tickers['Ticker']:
             query = f"""SELECT 
             Return_{self.look_back}_Month,
-            Percent_Positive_Over_{self.look_back}_Months, 
-            Percent_Negative_Over_{self.look_back}_Months,
+            Percent_Positive_Over_{self.lottery_window}_Months, 
+            Percent_Negative_Over_{self.lottery_window}_Months,
             OPEN
             FROM {_ticker_to_table_name(ticker)} 
             WHERE Date >= {date}
