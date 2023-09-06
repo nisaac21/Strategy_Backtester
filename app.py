@@ -1,8 +1,10 @@
 from dash import Dash, html
 import dash
 import dash_bootstrap_components as dbc
+import os
+import sys
 
-from visualization_app.components.navbar import navbar
+from components.navbar import navbar
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
@@ -18,4 +20,6 @@ app.layout = html.Div([
 
 
 if __name__ == '__main__':
+    currDir = os.path.dirname(os.path.realpath(__file__))
+    rootDir = os.path.abspath(os.path.join(currDir, '..'))
     app.run(debug=True)
