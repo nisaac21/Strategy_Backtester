@@ -51,25 +51,29 @@ def _create_tab(card_body, tab_label: str) -> dbc.Tab:
 about_cardbody = [dcc.Markdown(open(
     'visualization_app/components/project_summary.txt', "r").read())]
 
+strat_explanation = dcc.Markdown(open(
+    'visualization_app/components/strat_summary.txt', "r").read())
+
 select_style = {'maxWidth': '300px'}
 
 strategy_cardbody = [
-
+    strat_explanation,
     html.Center(
-        [dbc.Select(id='look_back', placeholder='Look Back Window', options=_create_options(
-            [12, 36, 60], 'Look Back Window:', 'Months'), style=select_style),
-         html.Br(),
-         dbc.Select(id='lottery_window', placeholder='Lottery Window', options=_create_options(
-             [1, 3, 6, 12], 'Lottery Window:', 'Months'), style=select_style),
-         html.Br(),
-         dbc.Select(id='rebalnce_period', placeholder='Rebalance Period', options=_create_options(
-             [1, 3, 6, 12], 'Rebalance Every:', 'Months'), style=select_style),
-         html.Br(),
-         dbc.Select(id='firms_held', placeholder='Firms Held', options=_create_options(
-             [25, 50, 100, 200], 'Hold:', 'Firms'), style=select_style),
-         html.Br(),
-         dbc.Button("Visualize Strategy", id='strategy_button'),
-         html.Div(id='my-output')]
+        [
+            dbc.Select(id='look_back', placeholder='Look Back Window', options=_create_options(
+                [12, 36, 60], 'Look Back Window:', 'Months'), style=select_style),
+            html.Br(),
+            dbc.Select(id='lottery_window', placeholder='Lottery Window', options=_create_options(
+                [1, 3, 6, 12], 'Lottery Window:', 'Months'), style=select_style),
+            html.Br(),
+            dbc.Select(id='rebalnce_period', placeholder='Rebalance Period', options=_create_options(
+                [1, 3, 6, 12], 'Rebalance Every:', 'Months'), style=select_style),
+            html.Br(),
+            dbc.Select(id='firms_held', placeholder='Firms Held', options=_create_options(
+                [25, 50, 100, 200], 'Hold:', 'Firms'), style=select_style),
+            html.Br(),
+            dbc.Button("Visualize Strategy", id='strategy_button'),
+            html.Div(id='my-output')]
     )
 ]
 
@@ -94,7 +98,7 @@ def create_performance_graph(equity_df):
 
     # Lime chart with plotlhy express
     performance_graph = px.line(spx_d_df, x='Date', y='Equity',
-                                title='Performance comparison', log_y=True)
+                                title='Performance Comparison', log_y=True)
 
     performance_graph.add_trace(px.line(equity_df, x='Date', y='Equity',
                                         color_discrete_sequence=['red'], log_y=True).data[0])
