@@ -1,0 +1,19 @@
+## Strategy Parameters
+
+**Look back period**: How long ago to judge a stock's generic momenutm. Generic momentum
+is defined as the absolute return of an equity over that time period. 
+
+**Lottery Window**: The 'lottery' bias of the market is the human tendency to overestimate 
+the likelihood of slim odds. This means that stocks the market overvalues high risk high reward 
+equities, therby leaving less investment capital for the steadier more consistent tickers. Our strategy
+utilizes this by measuring what percent of the days in the lottery window time period were positive for the 
+stock. 
+
+**Firms Held**: The maximum number of equities our strategy will hold at a time 
+
+**Rebalance Frequency**: How often we rebalance the portfolio 
+
+When constructing or rebalancing a portfolio, the strategy first sorts all equities in our database by their generic momentum (absolute return over look back period)
+over the look back period and selects the top 10%. The strategy will then organize the equities by their FIP score, calculated by
+ ```Generic Momentum * (Percent Positive Days - Percent Negative Days)``` for relevant periods and evenly distributes capital into 
+the top stocks held, building a maxium sized portfolio decided by the parameters.
