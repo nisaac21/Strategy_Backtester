@@ -2,7 +2,7 @@ from dash import Dash, html
 import dash
 import dash_bootstrap_components as dbc
 
-from components.navbar import navbar
+from visualization_app.components.navbar import navbar
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
