@@ -1,4 +1,4 @@
-from dash import Dash, dcc, html, Input, Output, State, callback
+from dash import Dash, html
 import dash
 import dash_bootstrap_components as dbc
 
@@ -18,4 +18,4 @@ app.layout = html.Div([
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=False)
