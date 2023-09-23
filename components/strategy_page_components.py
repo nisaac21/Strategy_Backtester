@@ -49,10 +49,10 @@ def _create_tab(card_body, tab_label: str) -> dbc.Tab:
 
 
 about_cardbody = [dcc.Markdown(open(
-    'visualization_app/components/project_summary.txt', "r").read())]
+    'components/project_summary.txt', "r").read())]
 
 strat_explanation = dcc.Markdown(open(
-    'visualization_app/components/strat_summary.txt', "r").read())
+    'components/strat_summary.txt', "r").read())
 
 select_style = {'maxWidth': '300px'}
 

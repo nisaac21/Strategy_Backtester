@@ -1,7 +1,10 @@
 import pandas as pd
-from dateutil import relativedelta
 import numpy as np
 from datetime import datetime
+import sqlite3
+from components.const import DATABASE_PATH
+
+conn = sqlite3.connect(DATABASE_PATH)
 
 
 def _overall_return(equity_timeseries: pd.DataFrame, starting_capital: int):
@@ -49,7 +52,7 @@ def _sharpe_ratio(equity_timeseries: pd.DataFrame) -> float:
         portfolio_data['Date'], format='%Y%m%d')
     portfolio_data['Daily_Return'] = portfolio_data['Equity'].pct_change()
 
-    risk_free_rates = pd.read_csv('./backtester_logic/data/TB3MS.csv')
+    risk_free_rates = pd.read_sql('SELECT * FROM TB3MS', con=conn)
     risk_free_rates['Date'] = pd.to_datetime(risk_free_rates['Date'])
 
     merged_data = pd.merge(
