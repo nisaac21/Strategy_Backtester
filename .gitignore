@@ -1,4 +1,5 @@
 /venv
+/.venv
 /backtester_logic/data
 /backtester_logic/__pycache__
 /backtester_logic/fixer.ipynb
