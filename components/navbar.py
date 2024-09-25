@@ -7,5 +7,5 @@ navbar = dbc.NavbarSimple(
                     href="/strategy-results")),
         # dbc.NavItem(dbc.NavLink("About Me", href="/about-me")), # TODO: BUILD OUT
     ],
-    brand="Quantitative Momemntum Strategy Viability",
+    brand="Quantitative Momentum Strategy Viability",
 )
